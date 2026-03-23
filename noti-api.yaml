@@ -1,0 +1,225 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: |
+    Сервис управления уведомлениями пользователей.
+
+    ## Источник уведомлений
+    Уведомления создаются асинхронно через RabbitMQ события от других сервисов:
+    - Order Service
+    - Offer Service
+    - Auth Service
+
+    ## Основные функции API
+    - Получение списка уведомлений
+    - Просмотр конкретного уведомления
+    - Отметка уведомлений как прочитанных
+    - Удаление уведомлений
+    - Редактирование уведомлений (админ)
+
+  version: 1.0.0
+
+servers:
+  - url: https://api.company.com/notifications
+    description: Production
+  - url: http://localhost:8003
+    description: Local development
+
+tags:
+  - name: Notifications
+    description: Операции с уведомлениями пользователя
+
+security:
+  - CookieAuth: []
+
+paths:
+
+  /api/v1/notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Получить список уведомлений пользователя
+      description: Возвращает уведомления текущего пользователя
+      parameters:
+        - in: query
+          name: is_read
+          schema:
+            type: boolean
+          description: Фильтр по статусу прочтения
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /api/v1/notifications/{notification_id}:
+    get:
+      tags:
+        - Notifications
+      summary: Получить конкретное уведомление
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Уведомление найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "404":
+          description: Уведомление не найдено
+
+    patch:
+      tags:
+        - Notifications
+      summary: Обновить уведомление
+      description: Используется для изменения текста или данных уведомления
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationRequest"
+      responses:
+        "200":
+          description: Уведомление обновлено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+
+    delete:
+      tags:
+        - Notifications
+      summary: Удалить уведомление
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Уведомление удалено
+
+  /api/v1/notifications/{notification_id}/read:
+    patch:
+      tags:
+        - Notifications
+      summary: Отметить уведомление как прочитанное
+      parameters:
+        - in: path
+          name: notification_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Уведомление отмечено как прочитанное
+
+  /api/v1/notifications/mark-all-read:
+    post:
+      tags:
+        - Notifications
+      summary: Отметить все уведомления как прочитанные
+      responses:
+        "200":
+          description: Все уведомления отмечены как прочитанные
+
+components:
+
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+  schemas:
+
+    NotificationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 10
+        user_id:
+          type: integer
+          example: 1
+        type:
+          type: string
+          example: order_ready
+        title:
+          type: string
+          example: Заказ готов
+        message:
+          type: string
+          example: Ваш заказ можно забрать
+        data_json:
+          type: object
+          example:
+            order_id: 55
+        is_read:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationResponse"
+        total:
+          type: integer
+          example: 100
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+
+    UpdateNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Обновленный заголовок
+        message:
+          type: string
+          example: Новый текст уведомления
+        data_json:
+          type: object
+          example:
+            order_id: 55
+
