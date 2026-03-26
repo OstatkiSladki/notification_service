@@ -1,27 +1,24 @@
-"""Notification business logic."""
-
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.notifications import NotificationRepository
 from schemas.notifications import UpdateNotificationRequest
 
 
 class NotificationService:
-    """Business operations for notification entities."""
 
     def __init__(self) -> None:
         self.repository = NotificationRepository()
 
-    def get_notifications(
+    async def get_notifications(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         is_read: bool | None = None,
         page: int = 1,
         limit: int = 20,
     ) -> dict:
         skip = (page - 1) * limit
-        items, total = self.repository.get_by_user(
+        items, total = await self.repository.get_by_user(
             db=db,
             user_id=user_id,
             is_read=is_read,
@@ -35,12 +32,12 @@ class NotificationService:
             "limit": limit,
         }
 
-    def get_notification(self, db: Session, notification_id: int):
-        return self.repository.get_by_id(db=db, notification_id=notification_id)
+    async def get_notification(self, db: AsyncSession, notification_id: int):
+        return await self.repository.get_by_id(db=db, notification_id=notification_id)
 
-    def create_notification(
+    async def create_notification(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         notification_type: str,
         title: str,
@@ -54,15 +51,15 @@ class NotificationService:
             "message": message,
             "data_json": data_json,
         }
-        return self.repository.create(db=db, payload=payload)
+        return await self.repository.create(db=db, payload=payload)
 
-    def update_notification(
+    async def update_notification(
         self,
-        db: Session,
+        db: AsyncSession,
         notification_id: int,
         payload: UpdateNotificationRequest,
     ):
-        notification = self.get_notification(db=db, notification_id=notification_id)
+        notification = await self.get_notification(db=db, notification_id=notification_id)
         if notification is None:
             return None
 
@@ -70,25 +67,25 @@ class NotificationService:
         if not update_data:
             return notification
 
-        return self.repository.update(db=db, notification=notification, payload=update_data)
+        return await self.repository.update(db=db, notification=notification, payload=update_data)
 
-    def delete_notification(self, db: Session, notification_id: int) -> bool:
-        notification = self.get_notification(db=db, notification_id=notification_id)
+    async def delete_notification(self, db: AsyncSession, notification_id: int) -> bool:
+        notification = await self.get_notification(db=db, notification_id=notification_id)
         if notification is None:
             return False
 
-        self.repository.delete(db=db, notification=notification)
+        await self.repository.delete(db=db, notification=notification)
         return True
 
-    def mark_notification_read(self, db: Session, notification_id: int):
-        notification = self.get_notification(db=db, notification_id=notification_id)
+    async def mark_notification_read(self, db: AsyncSession, notification_id: int):
+        notification = await self.get_notification(db=db, notification_id=notification_id)
         if notification is None:
             return None
 
-        return self.repository.mark_as_read(db=db, notification=notification)
+        return await self.repository.mark_as_read(db=db, notification=notification)
 
-    def mark_all_notifications_read(self, db: Session, user_id: int) -> dict:
-        marked_count = self.repository.mark_all_as_read(db=db, user_id=user_id)
+    async def mark_all_notifications_read(self, db: AsyncSession, user_id: int) -> dict:
+        marked_count = await self.repository.mark_all_as_read(db=db, user_id=user_id)
         return {"marked_count": marked_count}
 
 

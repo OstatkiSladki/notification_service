@@ -1,83 +1,74 @@
-"""Notification repository layer."""
+from datetime import UTC, datetime
 
-from datetime import datetime, timezone
-
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.notifications import Notification
 
 
 class NotificationRepository:
-    """Low-level CRUD operations for notifications."""
 
-    def create(self, db: Session, payload: dict) -> Notification:
+    async def create(self, db: AsyncSession, payload: dict) -> Notification:
         notification = Notification(**payload)
         db.add(notification)
-        db.commit()
-        db.refresh(notification)
+        await db.commit()
+        await db.refresh(notification)
         return notification
 
-    def get_by_id(self, db: Session, notification_id: int) -> Notification | None:
-        return (
-            db.query(Notification)
-            .filter(Notification.id == notification_id)
-            .first()
-        )
+    async def get_by_id(self, db: AsyncSession, notification_id: int) -> Notification | None:
+        result = await db.execute(select(Notification).where(Notification.id == notification_id))
+        return result.scalar_one_or_none()
 
-    def get_by_user(
+    async def get_by_user(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         is_read: bool | None = None,
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[list[Notification], int]:
-        query = db.query(Notification).filter(Notification.user_id == user_id)
+        base_query = select(Notification).where(Notification.user_id == user_id)
         if is_read is not None:
-            query = query.filter(Notification.is_read == is_read)
+            base_query = base_query.where(Notification.is_read == is_read)
 
-        total = query.count()
-        items = (
-            query
-            .order_by(Notification.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
+        total_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+        total = int(total_result.scalar_one())
+
+        items_result = await db.execute(
+            base_query.order_by(Notification.created_at.desc()).offset(skip).limit(limit)
         )
+        items = list(items_result.scalars().all())
         return items, total
 
-    def update(self, db: Session, notification: Notification, payload: dict) -> Notification:
+    async def update(
+        self, db: AsyncSession, notification: Notification, payload: dict
+    ) -> Notification:
         for key, value in payload.items():
             setattr(notification, key, value)
-        db.commit()
-        db.refresh(notification)
+        await db.commit()
+        await db.refresh(notification)
         return notification
 
-    def delete(self, db: Session, notification: Notification) -> None:
-        db.delete(notification)
-        db.commit()
+    async def delete(self, db: AsyncSession, notification: Notification) -> None:
+        await db.delete(notification)
+        await db.commit()
 
-    def mark_as_read(self, db: Session, notification: Notification) -> Notification:
+    async def mark_as_read(self, db: AsyncSession, notification: Notification) -> Notification:
         if notification.is_read:
             return notification
 
         payload = {
             "is_read": True,
-            "read_at": datetime.now(timezone.utc),
+            "read_at": datetime.now(UTC),
         }
-        return self.update(db, notification, payload)
+        return await self.update(db, notification, payload)
 
-    def mark_all_as_read(self, db: Session, user_id: int) -> int:
-        marked_count = (
-            db.query(Notification)
-            .filter(Notification.user_id == user_id, Notification.is_read.is_(False))
-            .update(
-                {
-                    Notification.is_read: True,
-                    Notification.read_at: datetime.now(timezone.utc),
-                },
-                synchronize_session=False,
-            )
+    async def mark_all_as_read(self, db: AsyncSession, user_id: int) -> int:
+        statement = (
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.is_read.is_(False))
+            .values(is_read=True, read_at=datetime.now(UTC))
         )
-        db.commit()
-        return marked_count
+        result = await db.execute(statement)
+        await db.commit()
+        return int(result.rowcount or 0)

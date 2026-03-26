@@ -1,5 +1,3 @@
-"""Application configuration loaded from environment variables."""
-
 from functools import lru_cache
 
 from pydantic import Field
@@ -7,13 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime settings for the Notification Service."""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = Field(default="Notification Service API")
     app_description: str = Field(
@@ -35,16 +28,27 @@ class Settings(BaseSettings):
     app_version: str = Field(default="1.0.0")
     api_v1_prefix: str = Field(default="/api/v1")
 
-    host: str = Field(default="0.0.0.0")
-    port: int = Field(default=8003)
-    reload: bool = Field(default=True)
-    database_url: str = Field(
-        default="postgresql+psycopg://postgres:postgres@localhost:5432/db_notification"
-    )
-    db_auto_create_tables: bool = Field(default=False)
+    app_host: str = Field(default="0.0.0.0")
+    app_port: int = Field(default=8005)
+    app_debug: bool = Field(default=False)
+    log_level: str = Field(default="INFO")
+
+    db_host: str = Field(default="localhost")
+    db_port: int = Field(default=5432)
+    db_name: str = Field(default="db_notification")
+    db_user: str = Field(default="postgres")
+    db_password: str = Field(default="postgres")
+    db_pool_size: int = Field(default=10)
+    db_max_overflow: int = Field(default=20)
+
+    @property
+    def database_dsn(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return cached application settings."""
     return Settings()

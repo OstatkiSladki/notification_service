@@ -1,5 +1,3 @@
-"""Pydantic schemas for notifications API."""
-
 from datetime import datetime
 from typing import Any
 
@@ -7,8 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationResponse(BaseModel):
-    """Serialized notification returned by the API."""
-
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     id: int | None = None
@@ -23,8 +19,6 @@ class NotificationResponse(BaseModel):
 
 
 class NotificationListResponse(BaseModel):
-    """Paginated notification list response."""
-
     model_config = ConfigDict(extra="forbid")
 
     items: list[NotificationResponse] = Field(default_factory=list)
@@ -34,10 +28,17 @@ class NotificationListResponse(BaseModel):
 
 
 class UpdateNotificationRequest(BaseModel):
-    """Request body for notification partial updates."""
-
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = None
     message: str | None = None
     data_json: dict[str, Any] | None = None
+
+
+class NotificationFilterParams(BaseModel):
+    is_read: bool | None = Field(
+        default=None,
+        description="Фильтр по статусу прочтения",
+    )
+    page: int = Field(default=1, ge=1)
+    limit: int = Field(default=20, le=100)
