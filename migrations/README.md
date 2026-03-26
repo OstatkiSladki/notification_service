@@ -1,12 +1,12 @@
 # Migrations
 
-В этой папке лежат SQL-миграции для сервиса уведомлений.
+Актуальные миграции выполняются через Alembic.
 
-Миграция `001_create_notification_notifications.sql` создает схему
-`notification` и таблицу `notifications`.
-
-Пример применения (PostgreSQL):
+Основные команды:
 
 ```bash
-psql "$DATABASE_URL" -f migrations/001_create_notification_notifications.sql
+uv run alembic upgrade head
+uv run alembic downgrade -1
 ```
+
+Файл `001_create_notification_notifications.sql` оставлен как исторический артефакт.
