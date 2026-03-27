@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     )
     app_version: str = Field(default="1.0.0")
     api_v1_prefix: str = Field(default="/api/v1")
+    app_root_path: str = Field(default="")
 
     app_host: str = Field(default="0.0.0.0")
     app_port: int = Field(default=8005)
