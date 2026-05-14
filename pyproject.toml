@@ -3,7 +3,7 @@ name = "notification-service"
 version = "1.0.0"
 description = "Notification service"
 readme = "docs/overview.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
   "fastapi>=0.115.0,<0.116.0",
   "uvicorn[standard]>=0.32.0,<0.33.0",
@@ -33,7 +33,7 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 indent-width = 4
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
