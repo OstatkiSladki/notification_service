@@ -30,7 +30,7 @@ tags:
     description: Операции с уведомлениями пользователя
 
 security:
-  - CookieAuth: []
+  - XUserIdAuth: []
 
 paths:
 
@@ -152,10 +152,10 @@ paths:
 components:
 
   securitySchemes:
-    CookieAuth:
+    XUserIdAuth:
       type: apiKey
-      in: cookie
-      name: access_token
+      in: header
+      name: X-User-ID
 
   schemas:
 
@@ -222,4 +222,3 @@ components:
           type: object
           example:
             order_id: 55
-

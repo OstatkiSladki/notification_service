@@ -1,70 +1,61 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from core.database import Base, get_db
+from dependency import get_db_session
 from main import app
 from models.notifications import Notification
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-engine = create_engine(
+engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
-).execution_options(schema_translate_map={"notification": None})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+)
+TestingSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
+async def override_get_db_session():
+    async with TestingSessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
-
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_database():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+app.dependency_overrides[get_db_session] = override_get_db_session
 
 
 @pytest.fixture(scope="function", autouse=True)
-def wipe_database():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+async def wipe_database():
+    async with engine.begin() as connection:
+        from core.database import Base
+
+        await connection.run_sync(Base.metadata.drop_all)
+        await connection.run_sync(Base.metadata.create_all)
     yield
 
 
 @pytest.fixture(scope="module")
-def client() -> TestClient:
-    with TestClient(app) as c:
+async def client() -> AsyncClient:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
 
 @pytest.fixture
 def user_headers() -> dict[str, str]:
-    return {"X-User-Id": "1"}
+    return {"X-User-ID": "1"}
 
 
 @pytest.fixture
 def another_user_headers() -> dict[str, str]:
-    return {"X-User-Id": "2"}
+    return {"X-User-ID": "2"}
 
 
 @pytest.fixture
-def seed_notification() -> int:
-    db = TestingSessionLocal()
-    try:
+async def seed_notification() -> int:
+    async with TestingSessionLocal() as db:
         item = Notification(
             user_id=1,
             type="order_created",
@@ -72,11 +63,9 @@ def seed_notification() -> int:
             message="Ваш заказ #101 принят",
             data_json={"order_id": 101},
             is_read=False,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(item)
-        db.commit()
-        db.refresh(item)
+        await db.commit()
+        await db.refresh(item)
         return item.id
-    finally:
-        db.close()
